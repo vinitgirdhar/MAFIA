@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { type NightActor, ACTOR_OF_PHASE, actorAlive, byId, checkWinner, living } from '../game/engine';
 import { play, say, stopSpeaking } from '../audio';
 import { useGame } from '../store';
@@ -163,13 +163,14 @@ const ROLE_FOR = { mafia: 'MAFIA', doctor: 'DOCTOR', police: 'POLICE' } as const
 
 /** A soft wash of the acting role's colour behind the screen. */
 function RoleGlow({ color }: { color: string }) {
+  const reduce = useReducedMotion();
   return (
     <motion.div
       className="pointer-events-none fixed inset-0"
       style={{ background: `radial-gradient(75% 42% at 50% 0%, ${color}38, transparent 72%)` }}
       initial={{ opacity: 0 }}
-      animate={{ opacity: [0, 1, 0.7, 1] }}
-      transition={{ duration: 3.2, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' }}
+      animate={reduce ? { opacity: 1 } : { opacity: [0, 1, 0.7, 1, 0.7, 1, 0] }}
+      transition={reduce ? { duration: 0.4 } : { duration: 7, ease: 'easeInOut', repeat: Infinity }}
       aria-hidden
     />
   );
@@ -215,10 +216,10 @@ function NightActionBody({ who }: { who: NightActor }) {
         center
         footer={
           <>
-            <Btn tone={r.tone} onClick={() => dispatch({ type: 'NIGHT_NEXT' })}>
+            <Btn quiet tone={r.tone} onClick={() => dispatch({ type: 'NIGHT_NEXT' })}>
               {a.next}
             </Btn>
-            <Btn variant="ghost" small onClick={() => dispatch({ type: 'NIGHT_BACK' })}>
+            <Btn quiet variant="ghost" small onClick={() => dispatch({ type: 'NIGHT_BACK' })}>
               {alive ? 'Change choice' : 'Back'}
             </Btn>
           </>
@@ -260,10 +261,10 @@ function NightActionBody({ who }: { who: NightActor }) {
         center
         footer={
           <>
-            <Btn tone={r.tone} onClick={() => dispatch({ type: 'NIGHT_NEXT' })}>
+            <Btn quiet tone={r.tone} onClick={() => dispatch({ type: 'NIGHT_NEXT' })}>
               {r.name}, close your eyes
             </Btn>
-            <Btn variant="ghost" small onClick={() => dispatch({ type: 'NIGHT_BACK' })}>
+            <Btn quiet variant="ghost" small onClick={() => dispatch({ type: 'NIGHT_BACK' })}>
               Back
             </Btn>
           </>
@@ -291,10 +292,10 @@ function NightActionBody({ who }: { who: NightActor }) {
           {who === 'police' && picked && (
             <PoliceResult key={picked} isMafia={!!state.night.policeIsMafia} name={byId(state, picked)?.name ?? ''} />
           )}
-          <Btn tone={r.tone} sfx="confirm" disabled={!picked} onClick={() => dispatch({ type: 'NIGHT_NEXT' })}>
+          <Btn quiet tone={r.tone} disabled={!picked} onClick={() => dispatch({ type: 'NIGHT_NEXT' })}>
             {who === 'police' ? 'Police, close your eyes' : a.confirm}
           </Btn>
-          <Btn variant="ghost" small onClick={() => dispatch({ type: 'NIGHT_BACK' })}>
+          <Btn quiet variant="ghost" small onClick={() => dispatch({ type: 'NIGHT_BACK' })}>
             Back
           </Btn>
         </>
@@ -312,6 +313,7 @@ function NightActionBody({ who }: { who: NightActor }) {
           {candidates.map((p, i) => (
             <PlayerCard
               key={p.id}
+              quiet
               index={i}
               compact
               name={p.name}
@@ -350,7 +352,6 @@ function PoliceResult({ isMafia, name }: { isMafia: boolean; name: string }) {
         type="button"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture?.(e.pointerId);
-          play('pop'); // identical for both outcomes: sound must never hint at the result
           setPeek(true);
         }}
         onPointerUp={off}

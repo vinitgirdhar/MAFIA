@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   type GameState,
@@ -66,6 +66,16 @@ export function Dashboard({
   const [unlocked, setUnlocked] = useState(false);
   const [showRoles, setShowRoles] = useState(false);
   const [pending, setPending] = useState<Pending>(null);
+  const drawer = useRef<HTMLElement>(null);
+
+  // Move focus into the drawer when it opens; Escape closes it (the confirm sheet handles its own Escape).
+  useEffect(() => {
+    if (!open) return;
+    drawer.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !pending && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, pending, onClose]);
 
   // Every opening starts locked and with roles hidden.
   useEffect(() => {
@@ -111,14 +121,10 @@ export function Dashboard({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
         >
-          <button
-            type="button"
-            aria-label="Close control center"
-            tabIndex={-1}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/65 backdrop-blur-sm"
-          />
+          <button type="button" aria-hidden tabIndex={-1} onClick={onClose} className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
           <motion.aside
+            ref={drawer}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label="Mayor control center"
@@ -126,7 +132,7 @@ export function Dashboard({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 34, stiffness: 320 }}
-            className="relative flex h-full w-[min(94vw,440px)] flex-col bg-ink pt-[env(safe-area-inset-top)] shadow-[-24px_0_60px_rgba(0,0,0,0.55)] ring-1 ring-white/10"
+            className="relative flex h-full w-[min(94vw,440px)] flex-col outline-none bg-ink pt-[env(safe-area-inset-top)] shadow-[-24px_0_60px_rgba(0,0,0,0.55)] ring-1 ring-white/10"
           >
             <header className="flex items-center justify-between px-5 py-3">
               <div>

@@ -79,7 +79,7 @@ export function GameOver() {
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', damping: 11, delay: 0.2 }}
               className={cn(
-                'mx-auto grid size-28 place-items-center rounded-full ring-2',
+                'relative mx-auto grid size-28 place-items-center rounded-full ring-2',
                 endedEarly ? 'bg-white/8 ring-white/20' : city ? 'bg-day/12 ring-day/40' : 'bg-mafia/15 ring-mafia/50',
                 accent,
               )}

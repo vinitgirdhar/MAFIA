@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
 import { PHASES, type Action, type GameState, initialState, reducer } from './game/engine';
 import { audio } from './audio';
 
@@ -57,7 +57,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(persistingReducer, undefined, loadGame);
   const [prefs, setPrefsState] = useState<Prefs>(() => ({ ...defaultPrefs, ...read<Partial<Prefs>>(PREFS_KEY) }));
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     audio.sfx = prefs.sfx;
     audio.voice = prefs.voice;
     write(PREFS_KEY, prefs);

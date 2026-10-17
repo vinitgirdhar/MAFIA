@@ -345,19 +345,27 @@ export function Letters({
   className?: string;
   letterClass?: string;
 }) {
+  let n = 0; // running index keeps the stagger continuous across words
   return (
     <span className={className} aria-label={text}>
-      {[...text].map((ch, i) => (
-        <motion.span
-          key={i}
-          aria-hidden
-          className={cn('inline-block', letterClass)}
-          initial={{ opacity: 0, y: 22, filter: 'blur(10px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          transition={{ delay: delay + i * 0.07, duration: 0.7, ease: EASE }}
-        >
-          {ch === ' ' ? '\u00A0' : ch}
-        </motion.span>
+      {text.split(' ').map((word, w) => (
+        <span key={w}>
+          {w > 0 && ' '}
+          <span className="inline-block whitespace-nowrap">
+            {[...word].map((ch, i) => (
+              <motion.span
+                key={i}
+                aria-hidden
+                className={cn('inline-block', letterClass)}
+                initial={{ opacity: 0, y: 22, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ delay: delay + n++ * 0.07, duration: 0.7, ease: EASE }}
+              >
+                {ch}
+              </motion.span>
+            ))}
+          </span>
+        </span>
       ))}
     </span>
   );
@@ -365,6 +373,8 @@ export function Letters({
 
 /** A one-shot full-screen colour flash that fades away (kills, eliminations). */
 export function Flash({ color = 'rgba(196,40,60,0.3)' }: { color?: string }) {
+  const reduce = useReducedMotion();
+  if (reduce) return null; // a full-screen flash is exactly what reduced-motion users opt out of
   return (
     <motion.div
       aria-hidden
@@ -500,8 +510,10 @@ export function Sheet({
   tall?: boolean;
 }) {
   useEffect(() => {
+    if (open) play('whoosh');
+  }, [open]);
+  useEffect(() => {
     if (!open) return;
-    play('whoosh');
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -598,6 +610,7 @@ export function PlayerCard({
   disabled,
   compact,
   index = 0,
+  quiet,
 }: {
   name: string;
   state?: CardState;
@@ -607,6 +620,7 @@ export function PlayerCard({
   disabled?: boolean;
   compact?: boolean;
   index?: number; // position in its list, for the staggered entrance
+  quiet?: boolean; // no click sound (night picks must sound identical whoever acts)
 }) {
   const inert = !onClick || disabled || state === 'dead' || state === 'done';
   const pop = { type: 'spring', stiffness: 640, damping: 17 } as const;
@@ -657,8 +671,8 @@ export function PlayerCard({
   );
   const enter = {
     initial: { opacity: 0, y: 14, scale: 0.97 },
-    animate: { opacity: 1, y: 0, scale: 1 },
-    transition: { delay: Math.min(index * 0.04, 0.5), duration: 0.4, ease: EASE },
+    // the delay belongs to the entrance only, so taps stay instant
+    animate: { opacity: 1, y: 0, scale: 1, transition: { delay: Math.min(index * 0.04, 0.5), duration: 0.4, ease: EASE } },
   };
   if (inert && !onClick) {
     return (
@@ -671,11 +685,11 @@ export function PlayerCard({
     <motion.button
       type="button"
       {...enter}
-      whileTap={inert ? undefined : { scale: 0.96 }}
+      whileTap={inert ? undefined : { scale: 0.96, transition: { type: 'spring', stiffness: 520, damping: 30 } }}
       disabled={inert}
       aria-pressed={state === 'selected'}
       onClick={() => {
-        play('select');
+        if (!quiet) play('select');
         onClick?.();
       }}
       className={cls}
@@ -716,7 +730,7 @@ export function Backdrop({ tone, moon }: { tone: Tone; moon?: boolean }) {
         <span className="absolute top-[14%] -left-1/3 h-16 w-2/3 animate-drift rounded-full bg-[#8fa6d8]/[0.07] blur-2xl [animation-duration:90s]" />
         <span className="absolute top-[30%] -left-1/3 h-12 w-1/2 animate-drift rounded-full bg-[#8fa6d8]/[0.05] blur-2xl [animation-delay:-40s] [animation-duration:120s]" />
         {/* the odd shooting star */}
-        <span className="absolute top-[5%] right-[38%] h-px w-14 animate-shoot bg-gradient-to-r from-transparent to-white [animation-delay:3s]" />
+        <span className="absolute top-[5%] right-[38%] h-px w-14 animate-shoot bg-gradient-to-l from-transparent to-white [animation-delay:3s]" />
         <div
           className={cn(
             'absolute top-[7%] right-[12%] size-14 animate-float rounded-full bg-[radial-gradient(circle_at_35%_35%,#fffdf4,#d3dbef_55%,#8f9cc0)] shadow-[0_0_60px_14px_rgba(150,175,255,0.22)] transition-[opacity,translate] duration-[1800ms] ease-out',

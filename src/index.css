@@ -100,6 +100,95 @@
   }
 }
 
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+@keyframes drift {
+  from {
+    transform: translateX(-40%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+@keyframes ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+@keyframes shimmer {
+  0% {
+    transform: translateX(-130%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    transform: translateX(280%);
+    opacity: 0;
+  }
+}
+@keyframes shoot {
+  0%,
+  90% {
+    transform: translate(0, 0) rotate(-24deg);
+    opacity: 0;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-240px, 110px) rotate(-24deg);
+    opacity: 0;
+  }
+}
+@keyframes mote {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.65;
+  }
+  55% {
+    transform: translate(16px, -46px);
+    opacity: 0.35;
+  }
+  80% {
+    opacity: 0.6;
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+/* Effects that only exist while animating are invisible at rest, so reduced-motion users never see a stray streak, dot or ring. */
+.animate-ring,
+.animate-shoot,
+.animate-mote,
+.animate-shimmer {
+  opacity: 0;
+}
+
 html,
 body,
 #root {

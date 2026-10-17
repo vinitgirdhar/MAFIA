@@ -27,7 +27,8 @@ export function TimeRuler({ value, onChange }: { value: number; onChange: (minut
   const raf = useRef(0);
   const touching = useRef(false); // true while the user (not a programmatic jump) is moving it
   const touchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const drag = useRef<{ x: number; left: number; moved: number } | null>(null);
+  const drag = useRef<{ x: number; left: number; moved: number; id: number; grabbing: boolean } | null>(null);
+  const wheel = useRef({ acc: 0, target: 0, at: 0 });
   const idx = indexFor(value);
   const shown = RULER_VALUES[idx];
 
@@ -45,6 +46,17 @@ export function TimeRuler({ value, onChange }: { value: number; onChange: (minut
       el.scrollTo({ left: idx * STEP, behavior: 'smooth' });
     }
   }, [idx]);
+
+  const endDrag = () => {
+    const el = scroller.current;
+    const d = drag.current;
+    if (!el || !d) return;
+    if (d.grabbing) {
+      el.style.scrollSnapType = '';
+      el.scrollTo({ left: Math.round(el.scrollLeft / STEP) * STEP, behavior: 'smooth' });
+    }
+    setTimeout(() => (drag.current = null), 0); // after the click that follows pointerup
+  };
 
   const jump = useCallback((i: number) => {
     scroller.current?.scrollTo({ left: Math.max(0, Math.min(N - 1, i)) * STEP, behavior: 'smooth' });
@@ -71,14 +83,26 @@ export function TimeRuler({ value, onChange }: { value: number; onChange: (minut
     });
   };
 
-  // vertical mouse wheel scrolls the ruler sideways
+  // vertical wheel / trackpad steps the ruler one tick per ~60px, so tiny deltas still add up
+  // (a raw scrollLeft nudge would just snap back)
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return; // sideways swipes scroll natively
       e.preventDefault();
-      el.scrollLeft += e.deltaY;
+      const w = wheel.current;
+      if (e.timeStamp - w.at > 400) {
+        w.acc = 0;
+        w.target = Math.round(el.scrollLeft / STEP);
+      }
+      w.at = e.timeStamp;
+      w.acc += e.deltaY;
+      const steps = Math.trunc(w.acc / 60);
+      if (!steps) return;
+      w.acc -= steps * 60;
+      w.target = Math.max(0, Math.min(N - 1, w.target + steps));
+      el.scrollTo({ left: w.target * STEP, behavior: 'smooth' });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -133,24 +157,24 @@ export function TimeRuler({ value, onChange }: { value: number; onChange: (minut
           onScroll={onScroll}
           onPointerDown={(e) => {
             if (e.pointerType !== 'mouse') return;
-            const el = scroller.current!;
-            drag.current = { x: e.clientX, left: el.scrollLeft, moved: 0 };
-            el.style.scrollSnapType = 'none';
-            el.setPointerCapture(e.pointerId);
+            drag.current = { x: e.clientX, left: scroller.current!.scrollLeft, moved: 0, id: e.pointerId, grabbing: false };
           }}
           onPointerMove={(e) => {
             const d = drag.current;
-            if (!d) return;
-            d.moved = Math.max(d.moved, Math.abs(e.clientX - d.x));
-            scroller.current!.scrollLeft = d.left - (e.clientX - d.x);
+            const el = scroller.current;
+            if (!d || !el) return;
+            const dx = e.clientX - d.x;
+            d.moved = Math.max(d.moved, Math.abs(dx));
+            if (!d.grabbing) {
+              if (d.moved <= 4) return; // still a click: don't capture the pointer, or the tick's onClick never fires
+              d.grabbing = true;
+              el.style.scrollSnapType = 'none';
+              el.setPointerCapture(d.id);
+            }
+            el.scrollLeft = d.left - dx;
           }}
-          onPointerUp={() => {
-            const el = scroller.current!;
-            if (!drag.current) return;
-            el.style.scrollSnapType = '';
-            el.scrollTo({ left: Math.round(el.scrollLeft / STEP) * STEP, behavior: 'smooth' });
-            setTimeout(() => (drag.current = null), 0);
-          }}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
           className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [mask-image:linear-gradient(to_right,transparent,black_24%,black_76%,transparent)] [-webkit-overflow-scrolling:touch]"
           style={{ paddingInline: `calc(50% - ${STEP / 2}px)`, cursor: 'grab', touchAction: 'pan-x' }}
         >
