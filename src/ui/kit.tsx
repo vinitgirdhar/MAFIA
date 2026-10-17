@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
-import { buzz, play } from '../audio';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { AnimatePresence, animate, motion, useReducedMotion, type HTMLMotionProps } from 'motion/react';
+import { buzz, play, type Sfx } from '../audio';
 
 export const cn = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(' ');
+
+/** House easing: quick start, soft landing. */
+export const EASE = [0.2, 0.8, 0.2, 1] as const;
 
 // ───────────────────────────── icons ─────────────────────────────
 
@@ -63,14 +66,15 @@ const SOLID: Record<ButtonTone, string> = {
   police: 'bg-police text-white active:bg-police/85',
 };
 
-interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface BtnProps extends HTMLMotionProps<'button'> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   tone?: ButtonTone;
   small?: boolean;
   quiet?: boolean; // no click sound
+  sfx?: Sfx; // which click sound (default: a soft tap)
 }
 
-export function Btn({ variant = 'primary', tone = 'ivory', small, quiet, className, onClick, children, ...rest }: BtnProps) {
+export function Btn({ variant = 'primary', tone = 'ivory', small, quiet, sfx = 'tap', className, onClick, children, ...rest }: BtnProps) {
   const styles = {
     primary: SOLID[tone],
     secondary: 'bg-white/8 text-ivory ring-1 ring-white/10 active:bg-white/14',
@@ -78,22 +82,24 @@ export function Btn({ variant = 'primary', tone = 'ivory', small, quiet, classNa
     danger: 'bg-mafia/15 text-mafia-hi ring-1 ring-mafia/40 active:bg-mafia/30',
   }[variant];
   return (
-    <button
+    <motion.button
       type="button"
+      whileTap={{ scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 520, damping: 30 }}
       {...rest}
       onClick={(e) => {
-        if (!quiet) play('tap');
+        if (!quiet) play(sfx);
         onClick?.(e);
       }}
       className={cn(
-        'inline-flex w-full items-center justify-center gap-2 rounded-2xl font-semibold tracking-tight transition-[transform,background-color,opacity] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-35',
+        'inline-flex w-full items-center justify-center gap-2 rounded-2xl font-semibold tracking-tight transition-colors duration-150 disabled:pointer-events-none disabled:opacity-35',
         small ? 'min-h-11 px-4 text-[15px]' : 'min-h-14 px-6 text-[17px]',
         styles,
         className,
       )}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }
 
@@ -142,19 +148,28 @@ export function HoldButton({
   const [progress, setProgress] = useState(0);
   const raf = useRef(0);
   const done = useRef(false);
+  const bucket = useRef(0);
 
   const stop = () => {
     cancelAnimationFrame(raf.current);
     done.current = false;
+    bucket.current = 0;
     setProgress(0);
   };
   const start = () => {
-    if (disabled || raf.current === -1) return;
+    if (disabled) return;
     const t0 = performance.now();
     done.current = false;
+    bucket.current = 0;
     const step = (now: number) => {
       const p = Math.min(1, (now - t0) / holdMs);
       setProgress(p);
+      const b = Math.floor(p * 5); // a rising tick every fifth of the hold
+      if (b > bucket.current && p < 1) {
+        bucket.current = b;
+        play('rise', 1 + b * 0.2);
+        buzz(8);
+      }
       if (p >= 1) {
         if (!done.current) {
           done.current = true;
@@ -191,14 +206,15 @@ export function HoldButton({
       onKeyUp={stop}
       onBlur={stop}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'none', transform: progress > 0 ? `scale(${1 + progress * 0.025})` : undefined }}
       className={cn(
-        'relative inline-flex min-h-16 w-full select-none items-center justify-center overflow-hidden rounded-2xl text-[17px] font-semibold tracking-tight disabled:opacity-35',
+        'relative inline-flex min-h-16 w-full select-none items-center justify-center overflow-hidden rounded-2xl text-[17px] font-semibold tracking-tight transition-transform duration-100 disabled:opacity-35',
         SOLID[tone],
         className,
       )}
     >
       <span className={cn('absolute inset-y-0 left-0', fill)} style={{ width: `${progress * 100}%` }} aria-hidden />
+      {progress > 0 && <span className="absolute inset-0 rounded-2xl ring-2 ring-white/50" style={{ opacity: progress }} aria-hidden />}
       <span className="relative flex items-center gap-2">{label}</span>
     </button>
   );
@@ -229,10 +245,26 @@ export function Page({
       >
         <div className={cn('w-full', center && 'my-auto py-4', className)}>{children}</div>
       </div>
-      {footer && <div className="space-y-3 px-5 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]">{footer}</div>}
+      {footer && (
+        <motion.div
+          initial={{ opacity: 0, y: 22 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.14, duration: 0.45, ease: EASE }}
+          className="space-y-3 px-5 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+        >
+          {footer}
+        </motion.div>
+      )}
     </div>
   );
 }
+
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.075, delayChildren: 0.04 } } };
+const rise = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } } };
+const riseBlur = {
+  hidden: { opacity: 0, y: 16, filter: 'blur(8px)' },
+  show: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.6, ease: EASE } },
+};
 
 export function Heading({
   kicker,
@@ -252,9 +284,14 @@ export function Heading({
   xl?: boolean;
 }) {
   return (
-    <div className={cn('text-center', className)}>
-      {kicker && <p className={cn('mb-2 text-xs font-semibold tracking-[0.28em] uppercase', kickerClass)}>{kicker}</p>}
-      <h1
+    <motion.div className={cn('text-center', className)} variants={stagger} initial="hidden" animate="show">
+      {kicker && (
+        <motion.p variants={rise} className={cn('mb-2 text-xs font-semibold tracking-[0.28em] uppercase', kickerClass)}>
+          {kicker}
+        </motion.p>
+      )}
+      <motion.h1
+        variants={riseBlur}
         className={cn(
           'leading-[1.05] font-extrabold text-balance',
           xl ? 'text-[3.4rem] tracking-[0.06em]' : 'text-[2rem] tracking-tight',
@@ -262,10 +299,161 @@ export function Heading({
         )}
       >
         {title}
-      </h1>
-      {sub && <p className="mx-auto mt-3 max-w-[30ch] text-[17px] leading-snug text-ivory/65 text-balance">{sub}</p>}
-    </div>
+      </motion.h1>
+      {sub && (
+        <motion.p variants={rise} className="mx-auto mt-3 max-w-[30ch] text-[17px] leading-snug text-ivory/65 text-balance">
+          {sub}
+        </motion.p>
+      )}
+    </motion.div>
   );
+}
+
+/** Fade-and-rise wrapper. Give siblings rising `delay`s for a cascade, or `scroll` to wait until it is on screen. */
+export function Reveal({
+  children,
+  delay = 0,
+  y = 16,
+  scroll,
+  className,
+}: {
+  children: ReactNode;
+  delay?: number;
+  y?: number;
+  scroll?: boolean;
+  className?: string;
+}) {
+  const props = scroll
+    ? { initial: { opacity: 0, y }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '0px 0px -8% 0px' } }
+    : { initial: { opacity: 0, y }, animate: { opacity: 1, y: 0 } };
+  return (
+    <motion.div {...props} transition={{ delay, duration: 0.5, ease: EASE }} className={className}>
+      {children}
+    </motion.div>
+  );
+}
+
+/** Letter-by-letter blur-in for big titles. `letterClass` is applied per letter (useful for gradient text). */
+export function Letters({
+  text,
+  delay = 0,
+  className,
+  letterClass,
+}: {
+  text: string;
+  delay?: number;
+  className?: string;
+  letterClass?: string;
+}) {
+  return (
+    <span className={className} aria-label={text}>
+      {[...text].map((ch, i) => (
+        <motion.span
+          key={i}
+          aria-hidden
+          className={cn('inline-block', letterClass)}
+          initial={{ opacity: 0, y: 22, filter: 'blur(10px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          transition={{ delay: delay + i * 0.07, duration: 0.7, ease: EASE }}
+        >
+          {ch === ' ' ? '\u00A0' : ch}
+        </motion.span>
+      ))}
+    </span>
+  );
+}
+
+/** A one-shot full-screen colour flash that fades away (kills, eliminations). */
+export function Flash({ color = 'rgba(196,40,60,0.3)' }: { color?: string }) {
+  return (
+    <motion.div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 z-20"
+      style={{ background: color }}
+      initial={{ opacity: 0.9 }}
+      animate={{ opacity: 0 }}
+      transition={{ duration: 1 }}
+    />
+  );
+}
+
+/** A tick that draws itself. */
+export function AnimatedCheck({
+  className = 'size-10',
+  delay = 0.15,
+  stroke = 2.4,
+}: {
+  className?: string;
+  delay?: number;
+  stroke?: number;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={stroke}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <motion.path
+        d={PATHS.check}
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ delay, duration: 0.45, ease: 'easeOut' }}
+      />
+    </svg>
+  );
+}
+
+/** A one-shot spray of sparks from the centre of its (relative) parent. Skipped for reduced motion. */
+export function Burst({
+  color = '#f0b765',
+  count = 16,
+  radius = 120,
+  size = 6,
+}: {
+  color?: string;
+  count?: number;
+  radius?: number;
+  size?: number;
+}) {
+  const reduce = useReducedMotion();
+  if (reduce) return null;
+  return (
+    <span aria-hidden className="pointer-events-none absolute top-1/2 left-1/2 size-0">
+      {Array.from({ length: count }, (_, i) => {
+        const r = (n: number) => (Math.sin(i * 12.9898 + n * 78.233) + 1) / 2;
+        const angle = (i / count) * Math.PI * 2 + r(1) * 0.4;
+        const dist = radius * (0.6 + r(2) * 0.6);
+        const d = size * (0.6 + r(3) * 0.8);
+        return (
+          <motion.span
+            key={i}
+            className="absolute rounded-full"
+            style={{ width: d, height: d, marginLeft: -d / 2, marginTop: -d / 2, background: color, boxShadow: `0 0 8px ${color}` }}
+            initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+            animate={{ x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, opacity: 0, scale: 0.2 }}
+            transition={{ duration: 0.9 + r(4) * 0.6, ease: 'easeOut' }}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
+/** Counts up from zero. */
+export function CountUp({ to, delay = 0, duration = 0.8 }: { to: number; delay?: number; duration?: number }) {
+  const reduce = useReducedMotion();
+  const [v, setV] = useState(reduce ? to : 0);
+  useEffect(() => {
+    if (reduce) return setV(to);
+    const c = animate(0, to, { duration, delay, ease: 'easeOut', onUpdate: (x) => setV(Math.round(x)) });
+    return () => c.stop();
+  }, [to, delay, duration, reduce]);
+  return <>{v}</>;
 }
 
 export function Chip({ children, className }: { children: ReactNode; className?: string }) {
@@ -284,12 +472,15 @@ export function Chip({ children, className }: { children: ReactNode; className?:
 /** A quoted line the Mayor reads aloud. */
 export function Say({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: 0.25, duration: 0.5, ease: EASE }}
       className={cn('mx-auto flex max-w-sm items-start gap-3 rounded-2xl bg-white/5 px-4 py-3 text-left ring-1 ring-white/8', className)}
     >
       <span className="mt-0.5 shrink-0 text-[11px] font-bold tracking-[0.2em] text-ivory/45 uppercase">Say</span>
       <p className="text-[17px] leading-snug text-ivory/90 italic">“{children}”</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -310,6 +501,7 @@ export function Sheet({
 }) {
   useEffect(() => {
     if (!open) return;
+    play('whoosh');
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -405,6 +597,7 @@ export function PlayerCard({
   onClick,
   disabled,
   compact,
+  index = 0,
 }: {
   name: string;
   state?: CardState;
@@ -413,8 +606,10 @@ export function PlayerCard({
   onClick?: () => void;
   disabled?: boolean;
   compact?: boolean;
+  index?: number; // position in its list, for the staggered entrance
 }) {
   const inert = !onClick || disabled || state === 'dead' || state === 'done';
+  const pop = { type: 'spring', stiffness: 640, damping: 17 } as const;
   const body = (
     <>
       <span
@@ -438,34 +633,55 @@ export function PlayerCard({
         </span>
         {note && <span className="block truncate text-[13px] text-ivory/55">{note}</span>}
       </span>
-      {state === 'selected' && <Icon name="check" className={compact ? 'size-5 shrink-0' : 'size-6 shrink-0'} />}
-      {state === 'done' && <Icon name="check" className="size-5 shrink-0 text-doctor-hi" />}
+      {state === 'selected' && (
+        <motion.span initial={{ scale: 0, rotate: -40 }} animate={{ scale: 1, rotate: 0 }} transition={pop} className="shrink-0">
+          <Icon name="check" className={compact ? 'size-5' : 'size-6'} />
+        </motion.span>
+      )}
+      {state === 'done' && (
+        <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={pop} className="shrink-0">
+          <Icon name="check" className="size-5 text-doctor-hi" />
+        </motion.span>
+      )}
       {state === 'dead' && <Icon name="skull" className="size-5 shrink-0 text-ivory/35" />}
     </>
   );
   const cls = cn(
-    'flex w-full items-center rounded-2xl text-ivory transition duration-150',
+    'flex w-full items-center rounded-2xl text-ivory transition-colors duration-200',
     compact ? 'gap-2.5 px-3' : 'gap-3 px-3.5',
     compact ? 'min-h-14' : 'min-h-[4.25rem]',
     state === 'selected' ? SELECTED[tone] : 'bg-white/5 ring-1 ring-white/8',
     state === 'done' && 'opacity-55',
     state === 'dead' && 'opacity-60',
-    !inert && state !== 'selected' && 'active:scale-[0.98] active:bg-white/10',
+    !inert && state !== 'selected' && 'active:bg-white/10',
   );
-  if (inert && !onClick) return <div className={cls}>{body}</div>;
+  const enter = {
+    initial: { opacity: 0, y: 14, scale: 0.97 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    transition: { delay: Math.min(index * 0.04, 0.5), duration: 0.4, ease: EASE },
+  };
+  if (inert && !onClick) {
+    return (
+      <motion.div {...enter} className={cls}>
+        {body}
+      </motion.div>
+    );
+  }
   return (
-    <button
+    <motion.button
       type="button"
+      {...enter}
+      whileTap={inert ? undefined : { scale: 0.96 }}
       disabled={inert}
       aria-pressed={state === 'selected'}
       onClick={() => {
-        play('tap');
+        play('select');
         onClick?.();
       }}
       className={cls}
     >
       {body}
-    </button>
+    </motion.button>
   );
 }
 
@@ -476,6 +692,11 @@ export type Tone = 'neutral' | 'night' | 'day';
 const STARS = Array.from({ length: 34 }, (_, i) => {
   const r = (n: number) => (Math.sin(i * 91.7 + n * 13.1) + 1) / 2;
   return { x: r(1) * 100, y: r(2) * 55, s: 1 + r(3) * 1.6, d: r(4) * 4 };
+});
+
+const MOTES = Array.from({ length: 12 }, (_, i) => {
+  const r = (n: number) => (Math.sin(i * 53.1 + n * 7.7) + 1) / 2;
+  return { x: r(1) * 100, y: 25 + r(2) * 70, s: 2 + r(3) * 3, d: r(4) * 12, t: 11 + r(5) * 9 };
 });
 
 export function Backdrop({ tone, moon }: { tone: Tone; moon?: boolean }) {
@@ -491,15 +712,27 @@ export function Backdrop({ tone, moon }: { tone: Tone; moon?: boolean }) {
             style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, animationDelay: `${s.d}s` }}
           />
         ))}
+        {/* clouds drifting past the moonlight */}
+        <span className="absolute top-[14%] -left-1/3 h-16 w-2/3 animate-drift rounded-full bg-[#8fa6d8]/[0.07] blur-2xl [animation-duration:90s]" />
+        <span className="absolute top-[30%] -left-1/3 h-12 w-1/2 animate-drift rounded-full bg-[#8fa6d8]/[0.05] blur-2xl [animation-delay:-40s] [animation-duration:120s]" />
+        {/* the odd shooting star */}
+        <span className="absolute top-[5%] right-[38%] h-px w-14 animate-shoot bg-gradient-to-r from-transparent to-white [animation-delay:3s]" />
         <div
           className={cn(
-            'absolute top-[7%] right-[12%] size-14 rounded-full bg-[radial-gradient(circle_at_35%_35%,#fffdf4,#d3dbef_55%,#8f9cc0)] shadow-[0_0_60px_14px_rgba(150,175,255,0.22)] transition-opacity duration-1000',
-            !moon && 'opacity-0',
+            'absolute top-[7%] right-[12%] size-14 animate-float rounded-full bg-[radial-gradient(circle_at_35%_35%,#fffdf4,#d3dbef_55%,#8f9cc0)] shadow-[0_0_60px_14px_rgba(150,175,255,0.22)] transition-[opacity,translate] duration-[1800ms] ease-out',
+            !moon && 'translate-y-20 opacity-0',
           )}
         />
       </div>
       <div className="absolute inset-0 transition-opacity duration-[1400ms]" style={{ opacity: tone === 'day' ? 1 : 0 }}>
-        <div className="absolute inset-0 bg-[radial-gradient(80%_46%_at_50%_0%,rgba(240,183,101,0.22)_0%,transparent_70%),linear-gradient(#191410,#100d0b_60%,#0b0a09)]" />
+        <div className="absolute inset-0 animate-breathe origin-top bg-[radial-gradient(80%_46%_at_50%_0%,rgba(240,183,101,0.22)_0%,transparent_70%),linear-gradient(#191410,#100d0b_60%,#0b0a09)]" />
+        {MOTES.map((m, i) => (
+          <span
+            key={i}
+            className="absolute animate-mote rounded-full bg-[#f6d9a0]"
+            style={{ left: `${m.x}%`, top: `${m.y}%`, width: m.s, height: m.s, animationDelay: `${m.d}s`, animationDuration: `${m.t}s` }}
+          />
+        ))}
       </div>
     </div>
   );

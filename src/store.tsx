@@ -8,7 +8,7 @@ const PREFS_KEY = 'mafia.prefs.v1';
 export interface Prefs {
   sfx: boolean;
   voice: boolean;
-  discussionMin: 0 | 2 | 3 | 5; // 0 = unlimited
+  discussionMin: number; // whole minutes, 0 = unlimited
   countdown: boolean;
   tourSeen: boolean;
 }

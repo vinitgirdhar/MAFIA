@@ -16,7 +16,8 @@ import {
 import { useGame } from '../store';
 import { MayorGate } from './Gate';
 import { HistoryList } from './History';
-import { Btn, Chip, Confirm, Icon, IconBtn, cn } from './kit';
+import { play } from '../audio';
+import { Btn, Chip, Confirm, EASE, Icon, IconBtn, cn } from './kit';
 import { ROLE_UI, RoleBadge } from './roles';
 
 const CONTINUE_LABEL: Partial<Record<GameState['phase'], string>> = {
@@ -33,15 +34,18 @@ const CONTINUE_LABEL: Partial<Record<GameState['phase'], string>> = {
   ELIMINATION: 'Continue after elimination',
 };
 
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.08 } } };
+const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } } };
+
 function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return (
-    <section className="space-y-2.5">
+    <motion.section variants={item} className="space-y-2.5">
       <div className="flex items-center justify-between">
         <h2 className="text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">{title}</h2>
         {aside}
       </div>
       {children}
-    </section>
+    </motion.section>
   );
 }
 
@@ -65,6 +69,7 @@ export function Dashboard({
 
   // Every opening starts locked and with roles hidden.
   useEffect(() => {
+    if (open) play('whoosh');
     if (!open) {
       setUnlocked(false);
       setShowRoles(false);
@@ -100,16 +105,29 @@ export function Dashboard({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-40 flex flex-col bg-ink"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 24 }}
+          className="fixed inset-0 z-40 flex justify-end"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Mayor control center"
         >
-          <div className="mx-auto flex min-h-0 w-full max-w-[460px] flex-1 flex-col pt-[env(safe-area-inset-top)]">
+          <button
+            type="button"
+            aria-label="Close control center"
+            tabIndex={-1}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+          />
+          <motion.aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mayor control center"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 34, stiffness: 320 }}
+            className="relative flex h-full w-[min(94vw,440px)] flex-col bg-ink pt-[env(safe-area-inset-top)] shadow-[-24px_0_60px_rgba(0,0,0,0.55)] ring-1 ring-white/10"
+          >
             <header className="flex items-center justify-between px-5 py-3">
               <div>
                 <p className="text-[11px] font-semibold tracking-[0.24em] text-ivory/45 uppercase">Mayor only</p>
@@ -130,17 +148,22 @@ export function Dashboard({
                 <MayorGate onPass={() => setUnlocked(true)} />
               </div>
             ) : (
-              <div className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-contain px-5 pt-1 pb-[max(2rem,env(safe-area-inset-bottom))]">
-                <div className="flex flex-wrap gap-2">
+              <motion.div
+                variants={stagger}
+                initial="hidden"
+                animate="show"
+                className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-contain px-5 pt-1 pb-[max(2rem,env(safe-area-inset-bottom))]"
+              >
+                <motion.div variants={item} className="flex flex-wrap gap-2">
                   <Chip className="!bg-white/12 !text-ivory">
                     <Icon name={nightPhase ? 'moon' : 'sun'} className="size-4" />
                     {roundLabel(state)}
                   </Chip>
                   <Chip>{PHASE_LABEL[state.phase]}</Chip>
                   {state.paused && <Chip className="!text-day">Paused</Chip>}
-                </div>
+                </motion.div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                <motion.div variants={item} className="grid grid-cols-2 gap-2.5">
                   <Stat label="Living" value={alive.length} />
                   <Stat label="Eliminated" value={dead} />
                   <Stat label="Votes in" value={state.vote ? `${prog.done} / ${prog.total}` : '—'} />
@@ -165,7 +188,7 @@ export function Dashboard({
                       ))}
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
                 {!over && (
                   <Section title="Controls">
@@ -428,9 +451,9 @@ export function Dashboard({
                     </div>
                   )}
                 </Section>
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.aside>
           <Confirm
             open={!!pending}
             danger

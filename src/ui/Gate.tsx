@@ -38,6 +38,7 @@ export function MayorGate({ onPass }: { onPass: () => void }) {
       onPass();
     } else {
       buzz([60, 40, 60]);
+      play('error');
       setShakes((n) => n + 1);
       setTimeout(() => setDigits(''), 250);
     }
@@ -52,7 +53,12 @@ export function MayorGate({ onPass }: { onPass: () => void }) {
         aria-label={`${digits.length} of 4 digits entered`}
       >
         {[0, 1, 2, 3].map((i) => (
-          <span key={i} className={cn('size-3.5 rounded-full ring-2 ring-ivory/60 transition', i < digits.length && 'bg-ivory')} />
+          <motion.span
+            key={i}
+            animate={{ scale: i < digits.length ? [1, 1.45, 1] : 1 }}
+            transition={{ duration: 0.25 }}
+            className={cn('size-3.5 rounded-full ring-2 ring-ivory/60 transition-colors', i < digits.length && 'bg-ivory')}
+          />
         ))}
       </div>
       <div className="grid grid-cols-3 gap-3">

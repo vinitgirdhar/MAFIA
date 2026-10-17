@@ -3,7 +3,7 @@ import { AnimatePresence, MotionConfig, motion, useIsPresent } from 'motion/reac
 import { type Phase, gameInProgress, living, roundLabel } from './game/engine';
 import { unlockAudio } from './audio';
 import { GameCtx, useGame } from './store';
-import { Backdrop, Icon, IconBtn, type Tone } from './ui/kit';
+import { Backdrop, EASE, Icon, IconBtn, type Tone } from './ui/kit';
 import { GateScreen } from './ui/Gate';
 import { Dashboard } from './ui/Dashboard';
 import { HistorySheet } from './ui/History';
@@ -148,7 +148,12 @@ export default function App() {
         <Backdrop tone={tone} moon={!state.onHome && phase === 'NIGHT_START'} />
         <div className="relative mx-auto flex h-full w-full max-w-[460px] flex-col pt-[env(safe-area-inset-top)]">
           {showBar && (
-            <header className="flex min-h-14 shrink-0 items-center justify-between px-3 pl-5">
+            <motion.header
+              initial={{ opacity: 0, y: -14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: EASE }}
+              className="flex min-h-14 shrink-0 items-center justify-between px-3 pl-5"
+            >
               {setup ? (
                 <button
                   type="button"
@@ -183,7 +188,7 @@ export default function App() {
                   </IconBtn>
                 )}
               </div>
-            </header>
+            </motion.header>
           )}
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

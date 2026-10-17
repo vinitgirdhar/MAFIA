@@ -2,7 +2,26 @@
 // Everything here is optional and fire-and-forget. Narration only ever receives fixed phrases —
 // never a player's name, a night selection or an investigation result.
 
-export type Sfx = 'tap' | 'night' | 'dawn' | 'suspense' | 'reveal' | 'vote' | 'tick' | 'bell' | 'win' | 'lose';
+export type Sfx =
+  | 'tap'
+  | 'night'
+  | 'dawn'
+  | 'suspense'
+  | 'reveal'
+  | 'vote'
+  | 'tick'
+  | 'bell'
+  | 'win'
+  | 'lose'
+  | 'select'
+  | 'confirm'
+  | 'error'
+  | 'whoosh'
+  | 'pop'
+  | 'drop'
+  | 'sparkle'
+  | 'tock'
+  | 'rise';
 
 let ctx: AudioContext | null = null;
 export const audio = { sfx: true, voice: false };
@@ -59,7 +78,8 @@ function noise(c: AudioContext, at: number, dur: number, gain: number, freq: num
   src.start(at);
 }
 
-const SOUNDS: Record<Sfx, (c: AudioContext, t: number) => void> = {
+/** `p` is a pitch multiplier, used by sounds that climb (hold progress, ruler steps). */
+const SOUNDS: Record<Sfx, (c: AudioContext, t: number, p: number) => void> = {
   tap: (c, t) => tone(c, 560, t, 0.06, { gain: 0.04 }),
   vote: (c, t) => {
     tone(c, 330, t, 0.09, { gain: 0.06, type: 'triangle' });
@@ -95,12 +115,56 @@ const SOUNDS: Record<Sfx, (c: AudioContext, t: number) => void> = {
     [110, 131, 156].forEach((f) => tone(c, f, t, 3, { gain: 0.07, to: f * 0.8, attack: 0.4, type: 'sawtooth' }));
     noise(c, t, 1.4, 0.05, 400);
   },
+  // a soft pluck when a card is picked
+  select: (c, t, p) => {
+    tone(c, 620 * p, t, 0.09, { gain: 0.05, type: 'triangle' });
+    tone(c, 930 * p, t + 0.04, 0.12, { gain: 0.03, type: 'sine' });
+  },
+  // two rising notes: "locked in"
+  confirm: (c, t) => {
+    tone(c, 523, t, 0.12, { gain: 0.055, type: 'triangle' });
+    tone(c, 784, t + 0.09, 0.22, { gain: 0.06, type: 'triangle' });
+  },
+  error: (c, t) => {
+    tone(c, 150, t, 0.16, { gain: 0.07, to: 95, type: 'sawtooth' });
+    tone(c, 150, t + 0.18, 0.16, { gain: 0.07, to: 95, type: 'sawtooth' });
+  },
+  // a short air sweep for panels sliding in
+  whoosh: (c, t) => {
+    const len = Math.floor(c.sampleRate * 0.4);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource();
+    const filter = c.createBiquadFilter();
+    const g = c.createGain();
+    src.buffer = buf;
+    filter.type = 'bandpass';
+    filter.Q.value = 0.9;
+    filter.frequency.setValueAtTime(280, t);
+    filter.frequency.exponentialRampToValueAtTime(2600, t + 0.32);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.06, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+    src.connect(filter).connect(g).connect(c.destination);
+    src.start(t);
+  },
+  pop: (c, t) => tone(c, 420, t, 0.12, { gain: 0.06, to: 760, type: 'sine' }),
+  drop: (c, t) => tone(c, 520, t, 0.14, { gain: 0.05, to: 240, type: 'triangle' }),
+  sparkle: (c, t) => [1319, 1568, 1976, 2349].forEach((f, i) => tone(c, f, t + i * 0.06, 0.4, { gain: 0.03 })),
+  tock: (c, t, p) => tone(c, 300 * p, t, 0.05, { gain: 0.07, type: 'square' }),
+  rise: (c, t, p) => tone(c, 330 * p, t, 0.09, { gain: 0.045, type: 'triangle' }),
 };
 
-export function play(name: Sfx) {
+const lastPlayed: Partial<Record<Sfx, number>> = {};
+
+export function play(name: Sfx, pitch = 1) {
   if (!audio.sfx) return;
+  const now = performance.now();
+  if (now - (lastPlayed[name] ?? 0) < 35) return; // never stack the same sound within a frame or two
+  lastPlayed[name] = now;
   const c = ac();
-  if (c) SOUNDS[name](c, c.currentTime + 0.02);
+  if (c) SOUNDS[name](c, c.currentTime + 0.02, pitch);
 }
 
 export function say(text: string) {

@@ -2,108 +2,82 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Role } from '../game/engine';
 import { useGame } from '../store';
-import { Btn, Icon, type IconName, Sheet, Toggle, cn } from './kit';
+import { Btn, Icon, type IconName, Reveal, Sheet, Toggle, cn } from './kit';
+import { TimeRuler } from './TimeRuler';
 import { ROLE_UI, RoleBadge } from './roles';
 
-const ROLE_TEXT: Record<Role, string> = {
-  MAFIA: 'Secretly kills one player every night. Wins by outnumbering the innocents — with one Mafia, that means only one innocent left.',
-  DOCTOR: 'Secretly protects one player every night, themselves included. If the Mafia picked that person, nobody dies.',
-  POLICE:
-    'Secretly investigates one player every night and privately learns whether they are the Mafia. Must persuade the others — carefully.',
-  CITIZEN: 'No night power. Listen, accuse, defend and vote. Citizens, Doctor and Police are one team.',
+const ROLE_LINE: Record<Role, string> = {
+  MAFIA: 'Kills one person each night',
+  DOCTOR: 'Saves one person each night',
+  POLICE: 'Checks if someone is Mafia',
+  CITIZEN: 'Talks, votes, finds the Mafia',
 };
+
+const ROUNDS: { icon: IconName; title: string; line: string }[] = [
+  { icon: 'moon', title: 'Night', line: 'Eyes closed' },
+  { icon: 'sun', title: 'Day', line: 'Talk it out' },
+  { icon: 'vote', title: 'Vote', line: 'Most votes out' },
+];
 
 export function HowToPlay({ open, onClose, onTour }: { open: boolean; onClose: () => void; onTour: () => void }) {
   return (
-    <Sheet open={open} onClose={onClose} title="How to Play" tall>
-      <div className="space-y-8 pb-4">
-        <div className="text-center">
-          <p className="text-[17px] leading-snug text-ivory/80">
-            One phone. One <b>Mayor</b> who runs the game. Everyone else is hiding a role. Find the killer before the city falls.
+    <Sheet open={open} onClose={onClose} title="How to Play">
+      <div className="space-y-4 pb-1">
+        <Reveal>
+          <p className="text-center text-[16px] leading-snug text-ivory/80">
+            One phone. One <b>Mayor</b> runs the game. Everyone else hides a secret role.
           </p>
+        </Reveal>
+
+        <div className="grid grid-cols-2 gap-2">
+          {(['MAFIA', 'DOCTOR', 'POLICE', 'CITIZEN'] as const).map((r, i) => (
+            <Reveal key={r} delay={0.08 + i * 0.07} y={12}>
+              <div className="flex h-full items-center gap-2.5 rounded-2xl bg-white/5 p-2.5 ring-1 ring-white/8">
+                <RoleBadge role={r} size="size-11" />
+                <div className="min-w-0">
+                  <p className={cn('text-[15px] leading-tight font-bold', ROLE_UI[r].text)}>{ROLE_UI[r].name}</p>
+                  <p className="text-[12.5px] leading-snug text-ivory/60">{ROLE_LINE[r]}</p>
+                </div>
+              </div>
+            </Reveal>
+          ))}
         </div>
 
-        <section className="space-y-2.5">
-          <h3 className="text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">The roles</h3>
-          {(['MAFIA', 'DOCTOR', 'POLICE', 'CITIZEN'] as const).map((r) => (
-            <div key={r} className="flex gap-3.5 rounded-2xl bg-white/5 p-3.5 ring-1 ring-white/8">
-              <RoleBadge role={r} size="size-14" />
-              <div className="min-w-0">
-                <p className={cn('text-[17px] leading-tight font-bold', ROLE_UI[r].text)}>{ROLE_UI[r].name}</p>
-                {r !== 'CITIZEN' && <p className="text-[12px] font-medium text-ivory/40">Exactly one in every game</p>}
-                <p className="mt-0.5 text-[14.5px] leading-snug text-ivory/65">{ROLE_TEXT[r]}</p>
+        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-stretch gap-1.5">
+          {ROUNDS.flatMap((r, i) => [
+            <Reveal key={r.title} delay={0.4 + i * 0.1} y={12}>
+              <div className="flex flex-col items-center gap-1 rounded-2xl bg-white/5 px-1.5 py-2.5 text-center ring-1 ring-white/8">
+                <Icon name={r.icon} className="size-5 text-night" />
+                <p className="text-[14px] leading-none font-bold">{r.title}</p>
+                <p className="text-[11.5px] leading-tight text-ivory/55">{r.line}</p>
               </div>
-            </div>
-          ))}
-        </section>
+            </Reveal>,
+            i < ROUNDS.length - 1 ? <Icon key={`a${i}`} name="back" className="size-3.5 self-center rotate-180 text-ivory/30" /> : null,
+          ])}
+        </div>
 
-        <section className="space-y-2.5">
-          <h3 className="text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">Every round</h3>
-          {[
-            [
-              'moon',
-              'Night',
-              'Everyone closes their eyes. The Mayor wakes the Mafia, then the Doctor, then the Police — each silently points at a player.',
-            ],
-            [
-              'sun',
-              'Morning',
-              'The city wakes. The Mayor announces who died — or that no one did. Nobody learns who was saved or investigated.',
-            ],
-            ['vote', 'Discussion', 'Talk, accuse, defend, bluff. Dead players are out and their roles stay secret.'],
-            [
-              'check',
-              'Vote',
-              'The phone goes in the middle. Each living player votes in secret. Most votes is eliminated. A tie triggers a runoff; a tied runoff means nobody goes.',
-            ],
-          ].map(([icon, title, body], i) => (
-            <div key={title} className="flex gap-3 rounded-2xl bg-white/5 p-3.5 ring-1 ring-white/8">
-              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white/10 text-sm font-bold">{i + 1}</span>
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 font-bold">
-                  <Icon name={icon as IconName} className="size-4 text-ivory/60" />
-                  {title}
-                </p>
-                <p className="mt-0.5 text-[14.5px] leading-snug text-ivory/65">{body}</p>
-              </div>
-            </div>
-          ))}
-        </section>
+        <Reveal delay={0.75} className="space-y-1.5">
+          <p className="rounded-2xl bg-day/8 px-3.5 py-2.5 text-[14.5px] ring-1 ring-day/25">
+            <b className="text-day">City wins</b> <span className="text-ivory/70">when the Mafia is voted out.</span>
+          </p>
+          <p className="rounded-2xl bg-mafia/10 px-3.5 py-2.5 text-[14.5px] ring-1 ring-mafia/30">
+            <b className="text-mafia-hi">Mafia wins</b> <span className="text-ivory/70">when only one innocent is left.</span>
+          </p>
+        </Reveal>
 
-        <section className="space-y-2.5">
-          <h3 className="text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">How it ends</h3>
-          <div className="grid gap-2.5">
-            <div className="rounded-2xl bg-day/8 p-3.5 ring-1 ring-day/25">
-              <p className="font-bold text-day">The city wins</p>
-              <p className="text-[14.5px] text-ivory/65">The moment the Mafia is voted out. The game stops right there.</p>
-            </div>
-            <div className="rounded-2xl bg-mafia/10 p-3.5 ring-1 ring-mafia/30">
-              <p className="font-bold text-mafia-hi">The Mafia wins</p>
-              <p className="text-[14.5px] text-ivory/65">
-                When living innocents are no more than living Mafia — in practice, the Mafia and one innocent are all that’s left.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-1.5 text-[14px] leading-snug text-ivory/55">
-          <h3 className="text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">Good to know</h3>
-          <p>• 4 to 20 players, plus the Mayor, who never plays or votes.</p>
-          <p>• Roles are random and revealed one person at a time by press-and-hold.</p>
-          <p>• Your game is saved automatically — refreshing or locking the phone is safe.</p>
-          <p>• Works offline once loaded. Browsers can’t block screenshots, so keep screens covered.</p>
-        </section>
-
-        <Btn
-          variant="secondary"
-          onClick={() => {
-            onClose();
-            onTour();
-          }}
-        >
-          <Icon name="info" className="size-5" />
-          Mayor’s tour: what to say
-        </Btn>
+        <Reveal delay={0.9}>
+          <Btn
+            variant="secondary"
+            small
+            onClick={() => {
+              onClose();
+              onTour();
+            }}
+          >
+            <Icon name="info" className="size-4" />
+            Mayor’s tour: what to say
+          </Btn>
+        </Reveal>
       </div>
     </Sheet>
   );
@@ -239,25 +213,9 @@ export function Settings({ open, onClose }: { open: boolean; onClose: () => void
           label="Night countdown"
           hint="5-second “close your eyes” countdown"
         />
-        <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/8">
-          <p className="text-[16px] font-medium">Default discussion timer</p>
-          <div className="mt-2.5 grid grid-cols-4 gap-2" role="radiogroup" aria-label="Default discussion timer">
-            {([2, 3, 5, 0] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={prefs.discussionMin === m}
-                onClick={() => setPrefs({ discussionMin: m })}
-                className={cn(
-                  'min-h-11 rounded-xl text-[14px] font-semibold ring-1 transition',
-                  prefs.discussionMin === m ? 'bg-ivory text-ink ring-ivory' : 'bg-white/6 ring-white/10 active:bg-white/12',
-                )}
-              >
-                {m === 0 ? '∞' : `${m} min`}
-              </button>
-            ))}
-          </div>
+        <div className="rounded-2xl bg-white/5 px-4 pt-4 pb-3 ring-1 ring-white/8">
+          <p className="mb-1 text-center text-[16px] font-medium">Default discussion timer</p>
+          <TimeRuler value={prefs.discussionMin} onChange={(m) => setPrefs({ discussionMin: m })} />
         </div>
         <p className="px-1 pt-2 text-center text-[12.5px] leading-snug text-ivory/40">
           Animations follow your device’s “reduce motion” setting. Everything is stored on this device only.

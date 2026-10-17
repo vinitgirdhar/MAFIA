@@ -12,10 +12,10 @@ import {
   normalizeName,
   roundLabel,
 } from '../game/engine';
-import { unlockAudio } from '../audio';
+import { play, unlockAudio } from '../audio';
 import { useInstall } from '../pwa';
 import { uid, useGame } from '../store';
-import { Btn, Chip, Confirm, Heading, Icon, IconBtn, Page, Sheet, Skyline, Toggle, cn } from '../ui/kit';
+import { Btn, Chip, Confirm, EASE, Heading, Icon, IconBtn, Letters, Page, Reveal, Sheet, Skyline, Toggle, cn } from '../ui/kit';
 
 // ───────────────────────────── home ─────────────────────────────
 
@@ -27,17 +27,33 @@ export function Home({ onHowTo, onSettings }: { onHowTo: () => void; onSettings:
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <Skyline
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] w-full opacity-80"
-        style={{
-          WebkitMaskImage:
-            'linear-gradient(to top, transparent 2%, black 48%), linear-gradient(to right, transparent, black 14%, black 86%, transparent)',
-          maskImage:
-            'linear-gradient(to top, transparent 2%, black 48%), linear-gradient(to right, transparent, black 14%, black 86%, transparent)',
-          WebkitMaskComposite: 'source-in',
-          maskComposite: 'intersect',
-        }}
-      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute top-[8%] right-[14%] size-11 rounded-full bg-[radial-gradient(circle_at_35%_35%,#fffdf4,#d3dbef_55%,#8f9cc0)] shadow-[0_0_50px_12px_rgba(150,175,255,0.2)]"
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 0.9, y: 0 }}
+        transition={{ duration: 2.4, ease: EASE, delay: 0.3 }}
+      >
+        <span className="absolute inset-0 animate-float rounded-full" />
+      </motion.div>
+      <motion.div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%]"
+        initial={{ y: 70, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 1.8, ease: EASE }}
+      >
+        <Skyline
+          className="size-full opacity-80"
+          style={{
+            WebkitMaskImage:
+              'linear-gradient(to top, transparent 2%, black 48%), linear-gradient(to right, transparent, black 14%, black 86%, transparent)',
+            maskImage:
+              'linear-gradient(to top, transparent 2%, black 48%), linear-gradient(to right, transparent, black 14%, black 86%, transparent)',
+            WebkitMaskComposite: 'source-in',
+            maskComposite: 'intersect',
+          }}
+        />
+      </motion.div>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <Page
           center
@@ -80,23 +96,22 @@ export function Home({ onHowTo, onSettings }: { onHowTo: () => void; onSettings:
             </>
           }
         >
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, ease: 'easeOut' }}
-            className="text-center"
-          >
-            <h1 className="bg-gradient-to-b from-ivory to-ivory/45 bg-clip-text pl-[0.1em] text-[clamp(3rem,18.5vw,5rem)] leading-none font-black tracking-[0.1em] text-transparent">
-              MAFIA
+          <div className="text-center">
+            <h1 className="pl-[0.1em] text-[clamp(3rem,18.5vw,5rem)] leading-none font-black tracking-[0.1em]">
+              <Letters text="MAFIA" delay={0.25} letterClass="bg-gradient-to-b from-ivory to-ivory/45 bg-clip-text text-transparent" />
             </h1>
-            <p className="mt-4 pl-[0.4em] text-[clamp(0.85rem,4.2vw,1.1rem)] font-light tracking-[0.4em] text-night uppercase">
-              The City Sleeps
-            </p>
-            <p className="mx-auto mt-10 max-w-[30ch] text-[17px] leading-snug text-balance text-ivory/60">
-              “One city. One killer. Trust no one.”
-            </p>
-            <p className="mt-2 text-sm font-medium tracking-wide text-ivory/35">Everyone has a role. Someone is lying.</p>
-          </motion.div>
+            <Reveal delay={0.95} y={10}>
+              <p className="mt-4 pl-[0.4em] text-[clamp(0.85rem,4.2vw,1.1rem)] font-light tracking-[0.4em] text-night uppercase">
+                The City Sleeps
+              </p>
+            </Reveal>
+            <Reveal delay={1.25}>
+              <p className="mx-auto mt-10 max-w-[30ch] text-[17px] leading-snug text-balance text-ivory/60">
+                “One city. One killer. Trust no one.”
+              </p>
+              <p className="mt-2 text-sm font-medium tracking-wide text-ivory/35">Everyone has a role. Someone is lying.</p>
+            </Reveal>
+          </div>
         </Page>
       </div>
       <Confirm
@@ -248,6 +263,7 @@ export function Registration() {
     if (name.toLocaleLowerCase() === state.mayorName.toLocaleLowerCase())
       return setError('That’s the Mayor’s name — the Mayor doesn’t play.');
     dispatch({ type: 'ADD_PLAYER', id: uid(), name });
+    play('pop');
     setDraft('');
     setError('');
     input.current?.focus();
@@ -368,7 +384,13 @@ export function Registration() {
                       >
                         <Icon name="pencil" className="size-5" />
                       </IconBtn>
-                      <IconBtn label={`Remove ${p.name}`} onClick={() => dispatch({ type: 'REMOVE_PLAYER', id: p.id })}>
+                      <IconBtn
+                        label={`Remove ${p.name}`}
+                        onClick={() => {
+                          play('drop');
+                          dispatch({ type: 'REMOVE_PLAYER', id: p.id });
+                        }}
+                      >
                         <Icon name="trash" className="size-5" />
                       </IconBtn>
                     </>
@@ -398,7 +420,9 @@ export function Registration() {
             Roles are shuffled at random. Each player will privately discover theirs, one at a time.
           </p>
           <div className="space-y-2.5">
-            <Btn onClick={() => dispatch({ type: 'ASSIGN_ROLES', roles: dealRoles(players) })}>Assign Secret Roles</Btn>
+            <Btn sfx="confirm" onClick={() => dispatch({ type: 'ASSIGN_ROLES', roles: dealRoles(players) })}>
+              Assign Secret Roles
+            </Btn>
             <Btn variant="ghost" onClick={() => setStarting(false)}>
               Keep editing
             </Btn>

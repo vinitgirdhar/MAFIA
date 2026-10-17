@@ -20,12 +20,12 @@ npm test           # engine rules + 150 fuzzed full games
 
 ## The game
 
-| Role | Night power |
-| --- | --- |
-| **Mafia** (always 1) | Silently kills one player |
-| **Doctor** (always 1) | Silently protects one player, themselves included. Same pick as the Mafia = nobody dies |
-| **Police** (always 1) | Silently investigates one player and privately learns if they are the Mafia |
-| **Citizen** (everyone else) | None — discuss and vote |
+| Role                        | Night power                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| **Mafia** (always 1)        | Silently kills one player                                                               |
+| **Doctor** (always 1)       | Silently protects one player, themselves included. Same pick as the Mafia = nobody dies |
+| **Police** (always 1)       | Silently investigates one player and privately learns if they are the Mafia             |
+| **Citizen** (everyone else) | None — discuss and vote                                                                 |
 
 Night → Mafia → Doctor → Police → Morning → Discussion → Vote → Elimination → victory check → next night.
 
@@ -35,15 +35,21 @@ Night → Mafia → Doctor → Police → Morning → Discussion → Vote → El
 
 ## Built for a shared phone
 
-- **Roles**: each player taps their own name, *holds* to reveal, then hides. A role can't be viewed twice, and it's hidden instantly if the app is backgrounded or the phone locks.
+- **Roles**: each player taps their own name, _holds_ to reveal, then hides. A role can't be viewed twice, and it's hidden instantly if the app is backgrounded or the phone locks.
 - **Votes**: ballots are hidden the moment they're confirmed; only counts are ever shown, never who voted for whom.
 - **Mayor gate**: night screens, the Control Center and "count the votes" sit behind an optional 4-digit passcode (or press-and-hold if none is set). The phone is re-locked whenever it has been out with the table.
 - **Police result** is visible only while a finger is held down and is never spoken. Voice narration only ever says fixed lines like "Mafia, wake up." — never names or results.
 - Browsers can't block screenshots, so the app doesn't pretend to.
 
+## Look and feel
+
+Cinematic, restrained motion: staggered screen entrances, springy cards and buttons, a rising moon and drifting clouds at night, a climbing sun and floating dust by day, sparks on role reveals and verdicts, and a screen shake on every death. Synthesized sound effects back each moment (selections, confirms, hold-to-reveal ticks, whooshes, a ticking last ten seconds). Everything respects the device's _reduce motion_ setting, and the speaker button mutes it all.
+
+The **discussion timer** is a scroll ruler (1–10 minutes or ∞): swipe it, drag it, use the mouse wheel or the arrow keys. The same ruler sets your default in Settings.
+
 ## Mayor Control Center (shield icon)
 
-Phase and round, living/eliminated counts, vote and night-action progress, continue / previous step / pause, reveal roles, review private night history, let one voter re-vote (without revealing ballots), reset the vote, restart (same players, new roles), end game, and **rewind**.
+A slide-in side drawer. Phase and round, living/eliminated counts, vote and night-action progress, continue / previous step / pause, reveal roles, review private night history, let one voter re-vote (without revealing ballots), reset the vote, restart (same players, new roles), end game, and **rewind**.
 
 Rewind restores a full snapshot taken at the start of each night and each vote, so every later night, vote and elimination is discarded and replayed — a correction can never leave inconsistent state behind. Roles are never re-rolled mid-game.
 
@@ -65,6 +71,6 @@ src/ui/              kit, gate, dashboard, history, guides
 sw-template.js       offline cache (the build injects the file list)
 ```
 
-The engine takes randomness and the clock as inputs and returns the *same state object* for any action the rules reject, which is what the UI uses to enable or disable buttons and what the tests assert.
+The engine takes randomness and the clock as inputs and returns the _same state object_ for any action the rules reject, which is what the UI uses to enable or disable buttons and what the tests assert.
 
 Inter font © The Inter Project Authors, SIL Open Font License (see `src/assets/fonts/LICENSE-Inter.txt`).

@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { type Role, byId, dealRoles } from '../game/engine';
 import { play } from '../audio';
 import { useGame } from '../store';
-import { Btn, Chip, Icon, Page, cn } from '../ui/kit';
+import { Burst, Btn, Chip, CountUp, Icon, Letters, Page, Reveal, cn } from '../ui/kit';
 import { HistoryList } from '../ui/History';
 import { ROLE_UI, RoleBadge, RoleIcon } from '../ui/roles';
 
@@ -85,6 +85,13 @@ export function GameOver() {
               )}
               style={{ boxShadow: `0 0 80px 6px ${glow}44` }}
             >
+              {!endedEarly && <Burst color={glow} count={22} radius={170} size={8} />}
+              {!endedEarly && (
+                <span
+                  className={cn('absolute inset-0 animate-ring rounded-full ring-2', city ? 'ring-day/40' : 'ring-mafia/50')}
+                  aria-hidden
+                />
+              )}
               {city || endedEarly ? (
                 <Icon name={endedEarly ? 'clock' : 'sun'} className="size-14" />
               ) : (
@@ -92,8 +99,12 @@ export function GameOver() {
               )}
             </motion.div>
             <div>
-              <h1 className={cn('text-[2.6rem] leading-none font-black tracking-tight', accent)}>{title}</h1>
-              <p className="mt-3 text-[18px] text-ivory/70">{sub}</p>
+              <h1 className={cn('text-[2.6rem] leading-none font-black tracking-tight', accent)}>
+                <Letters text={title} delay={0.45} />
+              </h1>
+              <Reveal delay={1.3} y={10}>
+                <p className="mt-3 text-[18px] text-ivory/70">{sub}</p>
+              </Reveal>
             </div>
           </motion.div>
 
@@ -102,75 +113,90 @@ export function GameOver() {
               [state.nights.length, 'Nights'],
               [saves, 'Doctor saves'],
               [eliminated, 'Eliminated'],
-            ].map(([n, l]) => (
-              <div key={l} className="rounded-2xl bg-white/5 py-3.5 ring-1 ring-white/8">
-                <p className="text-3xl font-black tabular-nums">{n}</p>
+            ].map(([n, l], i) => (
+              <Reveal key={l} delay={1.1 + i * 0.12} className="rounded-2xl bg-white/5 py-3.5 ring-1 ring-white/8">
+                <p className="text-3xl font-black tabular-nums">
+                  <CountUp to={n as number} delay={1.2 + i * 0.12} />
+                </p>
                 <p className="mt-0.5 text-[12px] font-medium text-ivory/50">{l}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
 
           <section>
             <h2 className="mb-2.5 text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">The secret identities</h2>
             <ul className="space-y-2">
-              {sorted.map((p) => (
-                <li key={p.id} className="flex items-center gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/8">
-                  <RoleBadge role={p.role!} />
-                  <div className="min-w-0 flex-1">
-                    <p className={cn('truncate text-[17px] font-semibold', !p.alive && 'text-ivory/60')}>{p.name}</p>
-                    <p className={cn('text-[14px] font-medium', ROLE_UI[p.role!].text)}>{ROLE_UI[p.role!].name}</p>
-                  </div>
-                  <Chip className={p.alive ? 'text-doctor-hi' : ''}>{p.alive ? 'Survived' : outLabel(p.id)}</Chip>
+              {sorted.map((p, i) => (
+                <li key={p.id}>
+                  <Reveal
+                    scroll
+                    delay={Math.min(i * 0.05, 0.3)}
+                    y={14}
+                    className="flex items-center gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/8"
+                  >
+                    <RoleBadge role={p.role!} />
+                    <div className="min-w-0 flex-1">
+                      <p className={cn('truncate text-[17px] font-semibold', !p.alive && 'text-ivory/60')}>{p.name}</p>
+                      <p className={cn('text-[14px] font-medium', ROLE_UI[p.role!].text)}>{ROLE_UI[p.role!].name}</p>
+                    </div>
+                    <Chip className={p.alive ? 'text-doctor-hi' : ''}>{p.alive ? 'Survived' : outLabel(p.id)}</Chip>
+                  </Reveal>
                 </li>
               ))}
             </ul>
           </section>
 
           {outs.length > 0 && (
-            <section>
-              <h2 className="mb-2.5 text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">Elimination order</h2>
-              <ol className="space-y-2">
-                {outs.map((e, i) => (
-                  <li key={e.playerId} className="flex items-center gap-3 rounded-2xl bg-white/5 px-4 py-3 ring-1 ring-white/8">
-                    <span className="w-5 text-sm font-semibold text-ivory/40 tabular-nums">{i + 1}</span>
-                    <span className="min-w-0 flex-1 truncate text-[16px] font-semibold">{byId(state, e.playerId)?.name}</span>
-                    <span className="text-[13px] text-ivory/55">
-                      {e.kind === 'night_kill' ? 'Killed' : 'Voted out'} · {e.kind === 'night_kill' ? 'Night' : 'Day'} {e.round}
-                    </span>
-                    {byId(state, e.playerId)?.role && <RoleBadge role={byId(state, e.playerId)!.role!} size="size-8" />}
-                  </li>
-                ))}
-              </ol>
-            </section>
+            <Reveal scroll>
+              <section>
+                <h2 className="mb-2.5 text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">Elimination order</h2>
+                <ol className="space-y-2">
+                  {outs.map((e, i) => (
+                    <li key={e.playerId} className="flex items-center gap-3 rounded-2xl bg-white/5 px-4 py-3 ring-1 ring-white/8">
+                      <span className="w-5 text-sm font-semibold text-ivory/40 tabular-nums">{i + 1}</span>
+                      <span className="min-w-0 flex-1 truncate text-[16px] font-semibold">{byId(state, e.playerId)?.name}</span>
+                      <span className="text-[13px] text-ivory/55">
+                        {e.kind === 'night_kill' ? 'Killed' : 'Voted out'} · {e.kind === 'night_kill' ? 'Night' : 'Day'} {e.round}
+                      </span>
+                      {byId(state, e.playerId)?.role && <RoleBadge role={byId(state, e.playerId)!.role!} size="size-8" />}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            </Reveal>
           )}
 
           {checks.length > 0 && (
-            <section>
-              <h2 className="mb-2.5 text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">Police investigations</h2>
-              <ul className="space-y-2">
-                {checks.map((n) => (
-                  <li
-                    key={n.round}
-                    className="flex items-center justify-between gap-3 rounded-2xl bg-police/8 px-4 py-3 ring-1 ring-police/20"
-                  >
-                    <span className="text-[15px]">
-                      <span className="text-ivory/50">Night {n.round}</span> · {byId(state, n.policeTarget)?.name}
-                    </span>
-                    <span
-                      className={cn('text-[13px] font-bold tracking-wide uppercase', n.policeIsMafia ? 'text-mafia-hi' : 'text-ivory/60')}
+            <Reveal scroll>
+              <section>
+                <h2 className="mb-2.5 text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">Police investigations</h2>
+                <ul className="space-y-2">
+                  {checks.map((n) => (
+                    <li
+                      key={n.round}
+                      className="flex items-center justify-between gap-3 rounded-2xl bg-police/8 px-4 py-3 ring-1 ring-police/20"
                     >
-                      {n.policeIsMafia ? 'Mafia' : 'Innocent'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+                      <span className="text-[15px]">
+                        <span className="text-ivory/50">Night {n.round}</span> · {byId(state, n.policeTarget)?.name}
+                      </span>
+                      <span
+                        className={cn('text-[13px] font-bold tracking-wide uppercase', n.policeIsMafia ? 'text-mafia-hi' : 'text-ivory/60')}
+                      >
+                        {n.policeIsMafia ? 'Mafia' : 'Innocent'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </Reveal>
           )}
 
-          <section>
-            <h2 className="mb-2.5 text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">What happened</h2>
-            <HistoryList state={state} showPrivate />
-          </section>
+          <Reveal scroll>
+            <section>
+              <h2 className="mb-2.5 text-[12px] font-semibold tracking-[0.2em] text-ivory/50 uppercase">What happened</h2>
+              <HistoryList state={state} showPrivate />
+            </section>
+          </Reveal>
         </div>
       </Page>
     </>

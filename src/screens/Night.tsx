@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { type NightActor, ACTOR_OF_PHASE, actorAlive, byId, checkWinner, living } from '../game/engine';
 import { play, say, stopSpeaking } from '../audio';
 import { useGame } from '../store';
-import { Btn, Heading, Icon, Page, PlayerCard, Say, cn } from '../ui/kit';
+import { Burst, Btn, EASE, Flash, Heading, Icon, Letters, Page, PlayerCard, Say, cn } from '../ui/kit';
 import { ROLE_UI, RoleIcon } from '../ui/roles';
 
 // ───────────────────────────── night start ─────────────────────────────
@@ -37,7 +37,7 @@ export function NightStart() {
         center
         footer={
           <>
-            <Btn onClick={() => (prefs.countdown ? setCount(5) : dispatch({ type: 'OPEN_NIGHT' }))}>
+            <Btn sfx="confirm" onClick={() => (prefs.countdown ? setCount(5) : dispatch({ type: 'OPEN_NIGHT' }))}>
               <Icon name="moon" className="size-5" />
               Begin the Night
             </Btn>
@@ -45,7 +45,7 @@ export function NightStart() {
         }
       >
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.1 }} className="space-y-8">
-          <Heading xl kicker="Mayor narration" title={<>NIGHT {state.round}</>} sub="The city falls silent." />
+          <Heading xl kicker="Mayor narration" title={<Letters text={`NIGHT ${state.round}`} delay={0.2} />} sub="The city falls silent." />
           <Say>Everyone, close your eyes.</Say>
         </motion.div>
       </Page>
@@ -62,17 +62,36 @@ export function NightStart() {
           >
             <div className="text-center">
               <p className="mb-6 text-lg tracking-wide text-ivory/70">Everyone, close your eyes…</p>
-              <AnimatePresence mode="wait">
-                <motion.p
-                  key={count}
-                  initial={{ opacity: 0, scale: 1.4 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-[8rem] leading-none font-black tabular-nums"
-                >
-                  {count}
-                </motion.p>
-              </AnimatePresence>
+              <div className="relative mx-auto grid size-52 place-items-center">
+                <svg viewBox="0 0 100 100" className="absolute inset-0 size-full -rotate-90" aria-hidden>
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="2" />
+                  <motion.circle
+                    key={count}
+                    cx="50"
+                    cy="50"
+                    r="46"
+                    fill="none"
+                    stroke="#8fa6d8"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    initial={{ pathLength: 1 }}
+                    animate={{ pathLength: 0 }}
+                    transition={{ duration: 1, ease: 'linear' }}
+                  />
+                </svg>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={count}
+                    initial={{ opacity: 0, scale: 1.5, filter: 'blur(8px)' }}
+                    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.3, ease: EASE }}
+                    className="text-[7rem] leading-none font-black tabular-nums"
+                  >
+                    {count}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
               <p className="mt-6 text-sm text-ivory/40">Tap to skip</p>
             </div>
           </motion.button>
@@ -142,9 +161,34 @@ const ACTORS: Record<
 };
 const ROLE_FOR = { mafia: 'MAFIA', doctor: 'DOCTOR', police: 'POLICE' } as const;
 
+/** A soft wash of the acting role's colour behind the screen. */
+function RoleGlow({ color }: { color: string }) {
+  return (
+    <motion.div
+      className="pointer-events-none fixed inset-0"
+      style={{ background: `radial-gradient(75% 42% at 50% 0%, ${color}38, transparent 72%)` }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0, 1, 0.7, 1] }}
+      transition={{ duration: 3.2, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' }}
+      aria-hidden
+    />
+  );
+}
+
 export function NightAction() {
+  const { state } = useGame();
+  const who = ACTOR_OF_PHASE[state.phase];
+  if (!who) return null;
+  return (
+    <>
+      <RoleGlow key={who} color={ROLE_UI[ROLE_FOR[who]].glow} />
+      <NightActionBody who={who} />
+    </>
+  );
+}
+
+function NightActionBody({ who }: { who: NightActor }) {
   const { state, dispatch } = useGame();
-  const who = ACTOR_OF_PHASE[state.phase]!;
   const a = ACTORS[who];
   const role = ROLE_FOR[who];
   const r = ROLE_UI[role];
@@ -182,9 +226,24 @@ export function NightAction() {
       >
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
           {header}
-          <div className={cn('mx-auto mb-6 grid size-24 place-items-center rounded-full opacity-60 ring-1', r.bg, r.ring, r.text)}>
+          <motion.div
+            initial={{ scale: 1, opacity: 1 }}
+            animate={{ scale: 0.9, opacity: 0.6 }}
+            transition={{ duration: 1.2, ease: EASE }}
+            className={cn('relative mx-auto mb-6 grid size-24 place-items-center rounded-full ring-1', r.bg, r.ring, r.text)}
+          >
             <RoleIcon role={role} className="size-12" />
-          </div>
+            {[0, 1].map((i) => (
+              <span
+                key={i}
+                aria-hidden
+                className="absolute animate-float text-lg font-bold text-ivory/45"
+                style={{ top: -6 - i * 10, right: -8 - i * 12, animationDelay: `${i * 0.8}s`, fontSize: 14 + i * 4 }}
+              >
+                z
+              </span>
+            ))}
+          </motion.div>
           <Heading title={a.close} titleClass={r.text} sub={alive ? 'Choice locked in.' : undefined} />
           <div className="mt-8">
             <Say>{a.sayClose}</Say>
@@ -232,7 +291,7 @@ export function NightAction() {
           {who === 'police' && picked && (
             <PoliceResult key={picked} isMafia={!!state.night.policeIsMafia} name={byId(state, picked)?.name ?? ''} />
           )}
-          <Btn tone={r.tone} disabled={!picked} onClick={() => dispatch({ type: 'NIGHT_NEXT' })}>
+          <Btn tone={r.tone} sfx="confirm" disabled={!picked} onClick={() => dispatch({ type: 'NIGHT_NEXT' })}>
             {who === 'police' ? 'Police, close your eyes' : a.confirm}
           </Btn>
           <Btn variant="ghost" small onClick={() => dispatch({ type: 'NIGHT_BACK' })}>
@@ -250,9 +309,10 @@ export function NightAction() {
           <p className="mx-auto mt-1 max-w-[34ch] text-center text-[14px] text-ivory/50">{a.hint}</p>
         </div>
         <div className="grid grid-cols-2 gap-2.5">
-          {candidates.map((p) => (
+          {candidates.map((p, i) => (
             <PlayerCard
               key={p.id}
+              index={i}
               compact
               name={p.name}
               tone={r.tone}
@@ -290,6 +350,7 @@ function PoliceResult({ isMafia, name }: { isMafia: boolean; name: string }) {
         type="button"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture?.(e.pointerId);
+          play('pop'); // identical for both outcomes: sound must never hint at the result
           setPeek(true);
         }}
         onPointerUp={off}
@@ -328,113 +389,150 @@ export function Morning() {
     if (stage !== 'building') return;
     play('suspense');
     const t = setTimeout(() => {
-      play('reveal');
+      play(victim ? 'reveal' : 'sparkle');
       setStage('revealed');
     }, 2800);
     return () => clearTimeout(t);
-  }, [stage]);
+  }, [stage, victim]);
 
   return (
-    <Page
-      center
-      footer={
-        stage === 'revealed' ? (
-          <>
-            <Btn onClick={() => dispatch({ type: 'MORNING_NEXT', timerMs })}>{winner ? 'See the Verdict' : 'Begin Discussion'}</Btn>
-          </>
-        ) : (
-          <Btn disabled={stage === 'building'} onClick={() => setStage('building')}>
-            {stage === 'building' ? 'Listen…' : 'Reveal the Night'}
-          </Btn>
-        )
-      }
-    >
-      <AnimatePresence mode="wait">
-        {stage !== 'revealed' ? (
-          <motion.div
-            key="pre"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.8 }}
-            className="space-y-8"
-          >
-            <Heading xl kicker="The sun rises over the city" title={<>DAY {state.round}</>} />
-            <Say>City, wake up.</Say>
-            {stage === 'building' && (
-              <div className="flex justify-center gap-2" aria-label="Revealing">
-                {[0, 1, 2].map((i) => (
-                  <motion.span
-                    key={i}
-                    className="size-2.5 rounded-full bg-ivory"
-                    animate={{ opacity: [0.2, 1, 0.2] }}
-                    transition={{ repeat: Infinity, duration: 1.1, delay: i * 0.25 }}
+    <>
+      <Sunrise />
+      {stage === 'revealed' && victim && <Flash />}
+      <Page
+        center
+        footer={
+          stage === 'revealed' ? (
+            <>
+              <Btn onClick={() => dispatch({ type: 'MORNING_NEXT', timerMs })}>{winner ? 'See the Verdict' : 'Begin Discussion'}</Btn>
+            </>
+          ) : (
+            <Btn disabled={stage === 'building'} sfx="confirm" onClick={() => setStage('building')}>
+              {stage === 'building' ? 'Listen…' : 'Reveal the Night'}
+            </Btn>
+          )
+        }
+      >
+        <AnimatePresence mode="wait">
+          {stage !== 'revealed' ? (
+            <motion.div
+              key="pre"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.8 }}
+              className="space-y-8"
+            >
+              <Heading xl kicker="The sun rises over the city" title={<Letters text={`DAY ${state.round}`} delay={0.3} />} />
+              <Say>City, wake up.</Say>
+              {stage === 'building' && (
+                <div className="relative flex justify-center gap-2" aria-label="Revealing">
+                  <span
+                    className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 animate-ring rounded-full ring-1 ring-ivory/40"
+                    aria-hidden
                   />
-                ))}
+                  {[0, 1, 2].map((i) => (
+                    <motion.span
+                      key={i}
+                      className="size-2.5 rounded-full bg-ivory"
+                      animate={{ opacity: [0.2, 1, 0.2] }}
+                      transition={{ repeat: Infinity, duration: 1.1, delay: i * 0.25 }}
+                    />
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          ) : victim ? (
+            <motion.div
+              key="dead"
+              initial={{ opacity: 0, x: 0 }}
+              animate={{ opacity: 1, x: [0, -12, 10, -7, 4, 0] }}
+              transition={{ opacity: { duration: 0.3 }, x: { duration: 0.5, delay: 0.05 } }}
+              className="space-y-7 text-center"
+              role="status"
+            >
+              <motion.div
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', damping: 12, delay: 0.15 }}
+                className="relative mx-auto grid size-24 place-items-center rounded-full bg-mafia/15 text-mafia-hi ring-2 ring-mafia/50 shadow-[0_0_70px_6px_rgba(196,40,60,0.35)]"
+              >
+                <Burst color="#ff6b78" count={16} radius={130} />
+                <Icon name="skull" className="size-11" />
+              </motion.div>
+              <div>
+                <motion.p
+                  initial={{ opacity: 0, scale: 1.25, filter: 'blur(10px)' }}
+                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                  transition={{ delay: 0.35, duration: 0.9 }}
+                  className="text-[clamp(2.6rem,13vw,4rem)] leading-none font-black tracking-tight break-words text-mafia-hi uppercase"
+                >
+                  {victim.name}
+                </motion.p>
+                <motion.h1
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1 }}
+                  className="mt-4 text-2xl font-extrabold tracking-tight"
+                >
+                  WAS KILLED LAST NIGHT
+                </motion.h1>
               </div>
-            )}
-          </motion.div>
-        ) : victim ? (
-          <motion.div
-            key="dead"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}
-            className="space-y-7 text-center"
-            role="status"
-          >
-            <motion.div
-              initial={{ scale: 0.4, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', damping: 12, delay: 0.15 }}
-              className="mx-auto grid size-24 place-items-center rounded-full bg-mafia/15 text-mafia-hi ring-2 ring-mafia/50 shadow-[0_0_70px_6px_rgba(196,40,60,0.35)]"
-            >
-              <Icon name="skull" className="size-11" />
-            </motion.div>
-            <div>
-              <motion.p
-                initial={{ opacity: 0, scale: 1.25, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                transition={{ delay: 0.35, duration: 0.9 }}
-                className="text-[clamp(2.6rem,13vw,4rem)] leading-none font-black tracking-tight break-words text-mafia-hi uppercase"
-              >
-                {victim.name}
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="text-[17px] text-ivory/60">
+                Another life has been lost.
               </motion.p>
-              <motion.h1
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1 }}
-                className="mt-4 text-2xl font-extrabold tracking-tight"
-              >
-                WAS KILLED LAST NIGHT
-              </motion.h1>
-            </div>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="text-[17px] text-ivory/60">
-              Another life has been lost.
-            </motion.p>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="safe"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
-            className="space-y-7 text-center"
-            role="status"
-          >
-            <motion.div
-              initial={{ scale: 0.4, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', damping: 12, delay: 0.15 }}
-              className="mx-auto grid size-24 place-items-center rounded-full bg-day/12 text-day ring-2 ring-day/40 shadow-[0_0_70px_6px_rgba(240,183,101,0.25)]"
-            >
-              <Icon name="sun" className="size-11" />
             </motion.div>
-            <h1 className="text-[2.2rem] leading-tight font-black tracking-tight">NO ONE DIED LAST NIGHT</h1>
-            <p className="text-[17px] text-ivory/60">Someone survived the darkness.</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Page>
+          ) : (
+            <motion.div
+              key="safe"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="space-y-7 text-center"
+              role="status"
+            >
+              <motion.div
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', damping: 12, delay: 0.15 }}
+                className="relative mx-auto grid size-24 place-items-center rounded-full bg-day/12 text-day ring-2 ring-day/40 shadow-[0_0_70px_6px_rgba(240,183,101,0.25)]"
+              >
+                <Burst color="#f0b765" count={18} radius={140} />
+                <motion.span
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 24, ease: 'linear' }}
+                  className="grid place-items-center"
+                >
+                  <Icon name="sun" className="size-11" />
+                </motion.span>
+              </motion.div>
+              <h1 className="text-[2.2rem] leading-tight font-black tracking-tight">NO ONE DIED LAST NIGHT</h1>
+              <p className="text-[17px] text-ivory/60">Someone survived the darkness.</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Page>
+    </>
+  );
+}
+
+/** The sun climbs from the bottom edge while the city wakes. */
+function Sunrise() {
+  return (
+    <motion.div
+      aria-hidden
+      className="pointer-events-none fixed inset-x-0 bottom-0 h-[55%] overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 1.6 }}
+    >
+      <motion.div
+        className="absolute bottom-0 left-1/2 aspect-square w-[150%] -translate-x-1/2 rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(255,205,120,0.42) 0%, rgba(240,183,101,0.16) 38%, transparent 66%)' }}
+        initial={{ y: '70%' }}
+        animate={{ y: '38%' }}
+        transition={{ duration: 3.2, ease: EASE }}
+      />
+    </motion.div>
   );
 }

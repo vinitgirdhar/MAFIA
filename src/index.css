@@ -41,6 +41,13 @@
   --animate-rise: rise 9s linear infinite;
   --animate-fall: fall 8s linear infinite;
   --animate-shake: shake 0.4s;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-drift: drift 70s linear infinite;
+  --animate-ring: ring 2.6s ease-out infinite;
+  --animate-shimmer: shimmer 2.4s ease-in-out infinite;
+  --animate-shoot: shoot 11s ease-in infinite;
+  --animate-mote: mote 14s ease-in-out infinite;
+  --animate-breathe: breathe 4.5s ease-in-out infinite;
 }
 
 @keyframes twinkle {

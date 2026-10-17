@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { byId, composition } from '../game/engine';
 import { play, buzz } from '../audio';
 import { useGame } from '../store';
-import { Btn, Chip, Heading, HoldButton, Icon, Page, PlayerCard, Say } from '../ui/kit';
+import { AnimatedCheck, Burst, Btn, Chip, Heading, HoldButton, Icon, Page, PlayerCard, Reveal, Say } from '../ui/kit';
 import { ROLE_UI, RoleIcon } from '../ui/roles';
 
 /** Grid of names: each player taps their own, in turn. */
@@ -21,9 +21,16 @@ export function RoleAssignment() {
           transition={{ duration: 0.6 }}
           className="space-y-6 text-center"
         >
-          <div className="mx-auto grid size-20 place-items-center rounded-full bg-doctor/15 text-doctor-hi ring-1 ring-doctor/40">
-            <Icon name="check" className="size-10" />
-          </div>
+          <motion.div
+            initial={{ scale: 0.5 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 13 }}
+            onAnimationStart={() => play('sparkle')}
+            className="relative mx-auto grid size-20 place-items-center rounded-full bg-doctor/15 text-doctor-hi ring-1 ring-doctor/40"
+          >
+            <Burst color="#5ddba9" count={14} radius={100} size={5} />
+            <AnimatedCheck className="size-10" />
+          </motion.div>
           <Heading kicker="Every player has a secret" title="ALL IDENTITIES ASSIGNED" sub="The city is ready." />
           <p className="text-[15px] text-ivory/50">Pass the phone to {state.mayorName}. Nobody else should look at the screen.</p>
         </motion.div>
@@ -41,9 +48,10 @@ export function RoleAssignment() {
           </Chip>
         </div>
         <div className="grid grid-cols-2 gap-2.5">
-          {state.players.map((p) => (
+          {state.players.map((p, i) => (
             <PlayerCard
               key={p.id}
+              index={i}
               compact
               name={p.name}
               state={p.roleViewed ? 'done' : 'idle'}
@@ -82,9 +90,15 @@ export function RoleReveal() {
     return (
       <Page center footer={<Btn onClick={() => dispatch({ type: 'CLOSE_REVEAL' })}>Done</Btn>}>
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5 text-center">
-          <div className="mx-auto grid size-20 place-items-center rounded-full bg-white/8 ring-1 ring-white/12">
-            <Icon name="lock" className="size-9" />
-          </div>
+          <motion.div
+            initial={{ scale: 0.6, rotate: -12 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 360, damping: 14 }}
+            onAnimationStart={() => play('confirm')}
+            className="relative mx-auto grid size-20 place-items-center rounded-full bg-white/8 ring-1 ring-white/12"
+          >
+            <AnimatedCheck className="size-9 text-doctor-hi" />
+          </motion.div>
           <Heading title="Identity secured." sub="Pass the phone to the next player." />
         </motion.div>
       </Page>
@@ -116,7 +130,13 @@ export function RoleReveal() {
           </>
         }
       >
-        <Heading kicker="Private screen" title={<>Are you {player.name}?</>} sub="Make sure nobody else can see your screen." />
+        <div className="space-y-7">
+          <div className="relative mx-auto grid size-20 place-items-center rounded-full bg-white/6 ring-1 ring-white/12">
+            <span className="absolute inset-0 animate-ring rounded-full ring-1 ring-ivory/30" aria-hidden />
+            <Icon name="eye" className="size-8 animate-breathe text-ivory/70" />
+          </div>
+          <Heading kicker="Private screen" title={<>Are you {player.name}?</>} sub="Make sure nobody else can see your screen." />
+        </div>
       </Page>
     );
   }
@@ -154,17 +174,32 @@ export function RoleReveal() {
             initial={{ scale: 0.6, rotate: -8 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: 'spring', damping: 14, stiffness: 140, delay: 0.1 }}
-            className={`mx-auto grid size-40 place-items-center rounded-full ring-2 ${r.bg} ${r.ring} ${r.text}`}
+            className={`relative mx-auto grid size-40 place-items-center rounded-full ring-2 ${r.bg} ${r.ring} ${r.text}`}
             style={{ boxShadow: `0 0 80px 8px ${r.glow}40` }}
           >
-            <RoleIcon role={player.role} className="size-24" />
+            <Burst color={r.glow} count={18} radius={150} size={7} />
+            <span className={`absolute inset-0 animate-ring rounded-full ring-2 ${r.ring}`} aria-hidden />
+            <span className={`absolute inset-0 animate-ring rounded-full ring-2 ${r.ring} [animation-delay:1.3s]`} aria-hidden />
+            <span className="animate-breathe">
+              <RoleIcon role={player.role} className="size-24" />
+            </span>
           </motion.div>
           <div>
-            <h1 className={`text-[2rem] leading-tight font-black tracking-tight ${r.text}`}>{r.title}</h1>
-            <p className="mx-auto mt-3 max-w-[26ch] text-[19px] leading-snug text-ivory/85">{r.blurb}</p>
+            <Reveal delay={0.35}>
+              <h1 className={`text-[2rem] leading-tight font-black tracking-tight ${r.text}`}>{r.title}</h1>
+            </Reveal>
+            <Reveal delay={0.5}>
+              <p className="mx-auto mt-3 max-w-[26ch] text-[19px] leading-snug text-ivory/85">{r.blurb}</p>
+            </Reveal>
           </div>
-          <p className="mx-auto max-w-[32ch] text-[14px] leading-snug text-ivory/50">{r.duty}</p>
-          {player.role !== 'CITIZEN' && <p className="text-[13px] text-ivory/40">The Mayor will wake you at night.</p>}
+          <Reveal delay={0.65}>
+            <p className="mx-auto max-w-[32ch] text-[14px] leading-snug text-ivory/50">{r.duty}</p>
+          </Reveal>
+          {player.role !== 'CITIZEN' && (
+            <Reveal delay={0.75}>
+              <p className="text-[13px] text-ivory/40">The Mayor will wake you at night.</p>
+            </Reveal>
+          )}
         </motion.div>
       </Page>
     </>
@@ -179,7 +214,7 @@ export function MayorBriefing() {
     <Page
       center
       footer={
-        <Btn onClick={() => dispatch({ type: 'START_FIRST_NIGHT' })}>
+        <Btn sfx="confirm" onClick={() => dispatch({ type: 'START_FIRST_NIGHT' })}>
           <Icon name="moon" className="size-5" />
           Begin Night 1
         </Btn>
@@ -202,10 +237,12 @@ export function MayorBriefing() {
             ['shield', 'The shield icon (top right) opens your Control Center: who is who, night choices, corrections.'],
             ['moon', 'Night: say each line aloud, then tap the player the secret role points at.'],
             ['vote', 'Day: the phone goes in the middle of the table for secret voting.'],
-          ].map(([icon, text]) => (
-            <li key={text} className="flex gap-3 rounded-2xl bg-white/5 p-3.5 ring-1 ring-white/8">
-              <Icon name={icon as 'shield'} className="mt-0.5 size-5 shrink-0 text-ivory/60" />
-              <span>{text}</span>
+          ].map(([icon, text], i) => (
+            <li key={text}>
+              <Reveal delay={0.35 + i * 0.12} y={12} className="flex gap-3 rounded-2xl bg-white/5 p-3.5 ring-1 ring-white/8">
+                <Icon name={icon as 'shield'} className="mt-0.5 size-5 shrink-0 text-ivory/60" />
+                <span>{text}</span>
+              </Reveal>
             </li>
           ))}
         </ul>
